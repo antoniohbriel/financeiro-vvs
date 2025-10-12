@@ -6,7 +6,6 @@
 
 - ✅ Cadastro e login de usuários
 - 💸 Adicionar receitas e despesas (transações)
-- 🎯 Definir e acompanhar metas financeiras
 - 📋 Visualizar histórico de transações
 - 🏠 Página inicial com atalhos rápidos para funcionalidades principais
 
@@ -23,3 +22,4 @@ Luton Money foi criado com o objetivo de facilitar o controle financeiro pessoal
 <p align="center">
   <img src="./Diagrama UML.png" alt="Diagrama UML do Luton Money" width="800" />
 </p>
+
