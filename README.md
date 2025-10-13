@@ -23,3 +23,8 @@ Luton Money foi criado com o objetivo de facilitar o controle financeiro pessoal
   <img src="./Diagrama UML.png" alt="Diagrama UML do Luton Money" width="800" />
 </p>
 
+## 🚧 Protótipo de Baixa Fidelidade
+
+<p align="center">
+  <img src="./Protótipo de Baixa Fidelidade.jpg" alt="Diagrama UML do Luton Money" width="800" />
+</p>
