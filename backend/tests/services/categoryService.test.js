@@ -3,6 +3,17 @@ const CategoryRepository = require("../../src/repositories/categoryRepository");
 
 jest.mock("../../src/repositories/categoryRepository");
 
+beforeEach(() => {
+  jest.clearAllMocks();
+
+  // funções
+  CategoryRepository.findAll = jest.fn();
+  CategoryRepository.findById = jest.fn();
+  CategoryRepository.create = jest.fn();
+  CategoryRepository.update = jest.fn();
+  CategoryRepository.delete = jest.fn();
+});
+
 describe("CategoryService", () => {
   afterEach(() => jest.clearAllMocks());
 

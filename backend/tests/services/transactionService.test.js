@@ -1,7 +1,7 @@
 const TransactionService = require("../../src/services/transactionService");
 const TransactionRepository = require("../../src/repositories/transactionRepository");
 
-// Mock do repositório (para não usar banco real)
+// mock do repositório pra não usar banco de dados real
 jest.mock("../../src/repositories/transactionRepository");
 
 describe("TransactionService", () => {

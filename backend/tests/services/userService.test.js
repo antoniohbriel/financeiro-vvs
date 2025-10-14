@@ -1,7 +1,21 @@
-const UserService = require("../../src/services/userService");
 const UserRepository = require("../../src/repositories/userRepository");
 
+// mock /utils
+jest.mock("../../src/utils/createUserWithDefaultCategories", () => ({
+  createUserWithDefaultCategories: jest.fn().mockResolvedValue(true),
+}));
+
+const UserService = require("../../src/services/userService");
+
+// mock repositório
 jest.mock("../../src/repositories/userRepository");
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  UserRepository.findByEmail = jest.fn();
+  UserRepository.create = jest.fn();
+  UserRepository.findAll = jest.fn();
+});
 
 describe("UserService", () => {
   afterEach(() => jest.clearAllMocks());
