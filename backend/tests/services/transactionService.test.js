@@ -6,23 +6,30 @@ describe("TransactionService - create", () => {
     const mockRepo = {
       create: jest.fn().mockResolvedValue({
         id: 7,
+        description: "Salário",
+        amount: 500,
         type: "income",
-        value: 500,
-        category_id: 10
+        date: new Date("2024-01-10"),
+        categoryId: 10,
+        userId: 1
       })
     };
 
     const service = TransactionService(mockRepo);
 
-    const result = await service.create({
+    const input = {
+      description: "Salário",
+      amount: 500,
       type: "income",
-      value: 500,
-      category_id: 10,
-      user_id: 1
-    });
+      categoryId: 10,
+      userId: 1,
+      date: "2024-01-10"
+    };
 
+    const result = await service.create(input);
+
+    expect(result.amount).toBe(500);
     expect(result.type).toBe("income");
-    expect(result.value).toBe(500);
-    expect(mockRepo.create).toHaveBeenCalled();
+    expect(mockRepo.create).toHaveBeenCalledTimes(1);
   });
 });
