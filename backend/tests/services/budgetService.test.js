@@ -1,25 +1,37 @@
 import { jest } from "@jest/globals";
 import BudgetService from "../../src/services/budgetService.js";
 
-describe("BudgetService - create", () => {
+describe("BudgetService - save", () => {
   it("deve criar um orçamento", async () => {
     const mockRepo = {
-      create: jest.fn().mockResolvedValue({
-        id: 5,
-        month: "2025-02",
-        limit: 1200
-      })
+      findAllByUser: jest.fn(),
+      findByUserAndCategory: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     };
+
+    mockRepo.findByUserAndCategory.mockResolvedValue(null);
+
+    mockRepo.create.mockResolvedValue({
+      id: 5,
+      user_id: 1,
+      category_id: 10,
+      amount: 500,
+    });
 
     const service = BudgetService(mockRepo);
 
-    const result = await service.create({
-      month: "2025-02",
-      limit: 1200,
-      user_id: 1
+    const result = await service.save(1, 10, 500);
+
+    expect(result).toEqual({
+      id: 5,
+      user_id: 1,
+      category_id: 10,
+      amount: 500,
     });
 
-    expect(result.limit).toBe(1200);
+    expect(mockRepo.findByUserAndCategory).toHaveBeenCalled();
     expect(mockRepo.create).toHaveBeenCalled();
   });
 });

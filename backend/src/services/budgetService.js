@@ -1,26 +1,24 @@
-import BudgetRepository from "../repositories/budgetRepository.js";
+export default function BudgetService(repository) {
+  return {
+    async list(userId) {
+      return repository.findAllByUser(userId);
+    },
 
-class BudgetService {
-  async list(userId) {
-    return BudgetRepository.findAllByUser(userId);
-  }
+    async save(user_id, category_id, amount) {
+      const existing = await repository.findByUserAndCategory(
+        user_id,
+        category_id
+      );
 
-  async save(userId, category, amount) {
-    const existing = await BudgetRepository.findByUserAndCategory(
-      userId,
-      category
-    );
+      if (existing) {
+        return repository.update(existing.id, amount);
+      }
 
-    if (existing) {
-      return BudgetRepository.update(existing.id, amount);
+      return repository.create(user_id, category_id, amount);
+    },
+
+    async delete(id) {
+      return repository.delete(id);
     }
-
-    return BudgetRepository.create(userId, category, amount);
-  }
-
-  async delete(id) {
-    return BudgetRepository.delete(id);
-  }
+  };
 }
-
-export default new BudgetService();
