@@ -19,6 +19,6 @@ describe("CategoryService - create", () => {
     });
 
     expect(result.name).toBe("Alimentação");
-    expect(mockRepo.create).toHaveBeenCalled();
+    expect(mockRepo.create).toHaveBeenCalledTimes(1);
   });
 });

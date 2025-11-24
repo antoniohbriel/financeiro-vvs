@@ -1,45 +1,39 @@
-import { PrismaClient } from "@prisma/client";
+// categoryService.js
+export default function CategoryService(repo) {
+  return {
+    list: async (user_id) => {
+      if (!user_id) throw { status: 400, message: "user_id obrigatório" };
+      return await repo.list(user_id);
+    },
 
-const prisma = new PrismaClient();
+    get: async (id) => {
+      const category = await repo.get(id);
+      if (!category) throw { status: 404, message: "Categoria não encontrada" };
+      return category;
+    },
 
-const CategoryService = {
-  list: async (user_id) => {
-    if (!user_id) throw { status: 400, message: "user_id obrigatório" };
+    create: async ({ name, user_id }) => {
+      if (!name || !user_id)
+        throw { status: 400, message: "Nome e usuário são obrigatórios" };
 
-    return await prisma.category.findMany({
-      where: { user_id },
-      include: { user: true },
-    });
-  },
+      return await repo.create({ name, user_id });
+    },
 
-  get: async (id) => {
-    const category = await prisma.category.findUnique({ where: { id } });
-    if (!category) throw { status: 404, message: "Categoria não encontrada" };
-    return category;
-  },
+    update: async (id, data) => {
+      try {
+        return await repo.update(id, data);
+      } catch {
+        throw { status: 404, message: "Categoria não encontrada" };
+      }
+    },
 
-  create: async ({ name, user_id }) => {
-    if (!name || !user_id) throw { status: 400, message: "Nome e usuário são obrigatórios" };
-
-    return await prisma.category.create({ data: { name, user_id } });
-  },
-
-  update: async (id, data) => {
-    try {
-      return await prisma.category.update({ where: { id }, data });
-    } catch {
-      throw { status: 404, message: "Categoria não encontrada" };
-    }
-  },
-
-  delete: async (id) => {
-    try {
-      await prisma.category.delete({ where: { id } });
-      return { message: "Categoria removida com sucesso" };
-    } catch {
-      throw { status: 404, message: "Categoria não encontrada" };
-    }
-  },
-};
-
-export default CategoryService;
+    delete: async (id) => {
+      try {
+        await repo.delete(id);
+        return { message: "Categoria removida com sucesso" };
+      } catch {
+        throw { status: 404, message: "Categoria não encontrada" };
+      }
+    },
+  };
+}
