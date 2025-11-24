@@ -4,20 +4,19 @@ import ProfilePictureService from "../../src/services/profilePictureService.js";
 describe("ProfilePictureService - save", () => {
   it("deve salvar a foto de perfil do usuário", async () => {
     const mockRepo = {
-      save: jest.fn().mockResolvedValue({
+      upsert: jest.fn().mockResolvedValue({
         user_id: 1,
-        url: "https://meusite.com/foto.png"
+        uploaded_at: new Date()
       })
     };
 
     const service = ProfilePictureService(mockRepo);
 
-    const result = await service.save({
-      user_id: 1,
-      url: "https://meusite.com/foto.png"
-    });
+    const buffer = Buffer.from("abc123");
 
-    expect(result.url).toContain("foto.png");
-    expect(mockRepo.save).toHaveBeenCalled();
+    const result = await service.uploadPhoto(1, buffer);
+
+    expect(result.user_id).toBe(1);
+    expect(mockRepo.upsert).toHaveBeenCalledTimes(1);
   });
 });
