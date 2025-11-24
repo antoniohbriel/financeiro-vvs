@@ -29,6 +29,11 @@
 - Multer (upload de imagens)  
 - JWT (autenticação)  
 
+## Testes (Unidade e Integração)
+- Jest (framework de testes)
+- Supertest (testes de integração HTTP)
+- Babel + ESM (suporte a módulos ES durante os testes)
+
 ---
 
 ## 🧩 Diagrama de Casos de Uso UML
@@ -100,3 +105,4 @@ API_URL=http://localhost:3000
 # ✅ 5. Iniciar a aplicação
 
 npx expo start
+
