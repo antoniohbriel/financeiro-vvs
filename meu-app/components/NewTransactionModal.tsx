@@ -10,8 +10,14 @@ import {
   Modal,
   Pressable,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiRequest } from "@/services/api"; 
+import { authRequest, getUser } from "@/services/auth";
+
+// Interface de Categoria
+interface Category {
+  id: number;
+  name: string;
+  userId?: number;
+}
 
 export type NewTransactionData = {
   description: string;
@@ -24,171 +30,222 @@ export type NewTransactionData = {
 interface NewTransactionModalProps {
   isVisible: boolean;
   onClose: () => void;
-  onSave: (data: NewTransactionData) => void;
-  availableCategories?: string[]; 
+  onSave: (data: NewTransactionData) => void; 
+  initialData?: NewTransactionData; // 1. O tipo foi adicionado corretamente
 }
 
 const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
   isVisible,
   onClose,
   onSave,
+  initialData, // 2. RECEBE A PROP
 }) => {
+  // 3. Estados inicializados vazios, serão preenchidos pelo useEffect
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<"income" | "expense">("expense");
-  const [categories, setCategories] = useState<string[]>(["Outros"]);
-  const [category, setCategory] = useState("Outros");
+  const [categoriesData, setCategoriesData] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
+  const currentDate = new Date().toISOString().split("T")[0];
+  const [date, setDate] = useState(currentDate); // Adicionei o estado 'date' para permitir edição futura, mas usando 'currentDate' como padrão.
+
+  // 🔹 useEffect para carregar categorias (mantido)
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const userJson = await AsyncStorage.getItem("@user");
-        if (!userJson) return;
-        const user = JSON.parse(userJson);
+        const user = await getUser();
+        if (!user?.id) return;
 
-        const data = await apiRequest(`/categories?userId=${user.id}`, "GET");
-        if (data.length > 0) {
-          setCategories(data.map((c: any) => c.name));
-          setCategory(data[0].name);
+        const data: Category[] = await authRequest(`/categories?userId=${user.id}`, "GET");
+        setCategoriesData(data);
+        
+        // Se houver dados iniciais, tenta selecionar a categoria correspondente.
+        if (initialData) {
+            const initialCat = data.find(c => c.name === initialData.category);
+            setSelectedCategory(initialCat || data[0] || null);
+        } else if (data.length > 0) {
+            setSelectedCategory(data[0]); // Padrão: primeira categoria
+        } else {
+            setSelectedCategory(null);
         }
+
       } catch (error) {
         console.error("Erro ao buscar categorias:", error);
+        setCategoriesData([]);
+        setSelectedCategory(null);
       }
     };
 
-    loadCategories();
-  }, []);
-
-  const handleSave = () => {
-    const parsedAmount = parseFloat(amount.replace(",", "."));
-    if (!description || parsedAmount <= 0 || isNaN(parsedAmount)) {
-      Alert.alert("Erro", "Preencha a descrição e um valor válido.");
-      return;
+    if (isVisible) {
+      loadCategories();
     }
+    // Adiciona isVisible às dependências para recarregar categorias quando o modal é aberto
+  }, [isVisible, initialData]); 
 
-    const newTransaction: NewTransactionData = {
-      description,
-      amount: parsedAmount,
-      type,
-      category,
-      date: currentDate,
-    };
 
-    onSave(newTransaction);
-    onClose();
+  // useEffect para SINCRONIZAR os dados iniciais com os estados do formulário
+  useEffect(() => {
+    if (isVisible) {
+      if (initialData) {
+        // Modo Edição: Preenche os estados
+        setDescription(initialData.description || "");
+        setAmount(initialData.amount?.toString() || "");
+        setType(initialData.type || "expense");
+        setDate(initialData.date || currentDate);
+        
+        // Atualiza a categoria selecionada (será sobrescrita pelo loadCategories se necessário)
+        const initialCat = categoriesData.find(c => c.name === initialData.category);
+        setSelectedCategory(initialCat || null);
+
+      } else {
+        // Modo Adicionar: Limpa os estados
+        setDescription("");
+        setAmount("");
+        setType("expense");
+        setDate(currentDate);
+        // Mantém a categoria selecionada como a primeira ou a que foi carregada por último
+      }
+    }
+  }, [isVisible, initialData, categoriesData]); // Depende de categoriesData para garantir a sincronia da categoria
+
+  const handleSelectCategory = (cat: Category) => {
+    setSelectedCategory(cat);
   };
 
-  const currentDate = new Date().toISOString().split("T")[0];
-  // Buscar categorias do usuário no backend
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        // Supondo que você tem o usuário logado no AsyncStorage
-        const userJson = await AsyncStorage.getItem("@user");
-        if (!userJson) return;
+const handleSave = () => {
+  if (isSaving) return;
+  setIsSaving(true);
 
-        const user = JSON.parse(userJson);
-        const data = await apiRequest(`/categories?userId=${user.id}`, "GET");
-        if (data.length > 0) {
-          setCategories(data.map((c: any) => c.name));
-          setCategory(data[0].name);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar categorias:", error);
-      }
-    }
+  const parsedAmount = parseFloat(amount.replace(",", "."));
 
-    fetchCategories();
-  }, []);
+  if (!description || isNaN(parsedAmount) || parsedAmount <= 0 || !selectedCategory) {
+    Alert.alert("Erro", "Preencha todos os campos corretamente.");
+    setIsSaving(false);
+    return;
+  }
+
+  // 🔹 envia os dados para o pai (Dashboard)
+  onSave({
+    description,
+    amount: parsedAmount,
+    type,
+    category: selectedCategory.name,
+    date,
+  });
+
+  // Limpa e fecha modal
+  setIsSaving(false);
+  onClose();
+};
+
 
   return (
     <Modal animationType="slide" transparent visible={isVisible}>
-      <Pressable style={styles.overlay} onPress={onClose} />
-      <View style={styles.centeredView}>
-        <View style={styles.modalView}>
-          <Text style={styles.modalTitle}>Nova Transação</Text>
+      <View style={{ flex: 1 }}>
+        <Pressable style={styles.overlay} onPress={onClose} />
 
-          {/* Tipo */}
-          <Text style={styles.label}>Tipo:</Text>
-          <View style={styles.typeContainer}>
-            <TouchableOpacity
-              onPress={() => setType("expense")}
-              style={[
-                styles.typeButton,
-                { backgroundColor: type === "expense" ? "#de1d6aff" : "#eee" },
-              ]}
-            >
-              <Text style={{ color: type === "expense" ? "#fff" : "#333" }}>
-                Despesa
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setType("income")}
-              style={[
-                styles.typeButton,
-                { backgroundColor: type === "income" ? "#8fccb6ff" : "#eee" },
-              ]}
-            >
-              <Text style={{ color: type === "income" ? "#fff" : "#333" }}>
-                Receita
-              </Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitle}>
+                {initialData ? "Editar Transação" : "Nova Transação"} 
+            </Text>
 
-          {/* Categoria */}
-          <Text style={styles.label}>Categoria:</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoryScrollContainer}
-          >
-            {categories.map((cat) => (
+            {/* Tipo */}
+            <Text style={styles.label}>Tipo:</Text>
+            <View style={styles.typeContainer}>
               <TouchableOpacity
-                key={cat}
-                onPress={() => setCategory(cat)}
+                onPress={() => setType("expense")}
                 style={[
-                  styles.categoryButton,
-                  {
-                    backgroundColor: category === cat ? "#4695a0ff" : "#f0f0f0",
-                  },
+                  styles.typeButton,
+                  { backgroundColor: type === "expense" ? "#de1d6a" : "#eee" },
                 ]}
               >
-                <Text style={{ color: category === cat ? "#fff" : "#333" }}>
-                  {cat}
+                <Text style={{ color: type === "expense" ? "#fff" : "#333" }}>Despesa</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setType("income")}
+                style={[
+                  styles.typeButton,
+                  { backgroundColor: type === "income" ? "#8fccb6" : "#eee" },
+                ]}
+              >
+                <Text style={{ color: type === "income" ? "#fff" : "#333" }}>Receita</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Categoria */}
+            <Text style={styles.label}>Categoria:</Text>
+            <ScrollView
+              horizontal
+              contentContainerStyle={styles.categoryScrollContainer}
+            >
+              {categoriesData.map((cat) => (
+                <TouchableOpacity
+                  key={cat.id}
+                  onPress={() => handleSelectCategory(cat)}
+                  style={[
+                    styles.categoryButton,
+                    {
+                      backgroundColor:
+                        selectedCategory?.id === cat.id ? "#4695a0" : "#f0f0f0",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={{
+                      color: selectedCategory?.id === cat.id ? "#fff" : "#333",
+                    }}
+                  >
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* Descrição */}
+            <Text style={styles.label}>Descrição:</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: Mercado, Salário..."
+              value={description}
+              onChangeText={setDescription}
+            />
+
+            {/* Valor */}
+            <Text style={styles.label}>Valor (R$):</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0.00"
+              keyboardType="numeric"
+              value={amount}
+              onChangeText={setAmount}
+            />
+
+            <Text style={styles.dateText}>Data: {date}</Text> {/* Usa o estado 'date' */}
+
+            {/* Botões */}
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={onClose}
+                disabled={isSaving}
+              >
+                <Text style={styles.cancelButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.saveButton, isSaving && { opacity: 0.7 }]}
+                onPress={handleSave}
+                disabled={isSaving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSaving ? "Salvando..." : "Salvar"}
                 </Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Descrição */}
-          <Text style={styles.label}>Descrição:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Ex: Mercado, Salário..."
-            value={description}
-            onChangeText={setDescription}
-          />
-
-          {/* Valor */}
-          <Text style={styles.label}>Valor (R$):</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0.00"
-            keyboardType="numeric"
-            value={amount}
-            onChangeText={setAmount}
-          />
-
-          <Text style={styles.dateText}>Data: {currentDate}</Text>
-
-          {/* Botões */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>Cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>Salvar</Text>
-            </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
@@ -197,7 +254,6 @@ const NewTransactionModal: React.FC<NewTransactionModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  centeredView: { flex: 1, justifyContent: "flex-end" },
   overlay: {
     position: "absolute",
     top: 0,
@@ -206,6 +262,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: "rgba(0,0,0,0.5)",
   },
+  centeredView: { flex: 1, justifyContent: "flex-end" },
   modalView: {
     width: "100%",
     backgroundColor: "white",
@@ -284,7 +341,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: "#4695a0ff",
+    backgroundColor: "#4695a0",
   },
   saveButtonText: { color: "#fff", fontWeight: "bold" },
 });

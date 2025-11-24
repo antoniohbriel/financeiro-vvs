@@ -1,88 +1,87 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
-  StyleSheet,
-  ScrollView,
   View,
+  ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  StyleSheet,
 } from "react-native";
+import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+
+import { getUser, logout, authRequest } from "@/services/auth";
+import CategoryChart from "@/components/CategoryChart";
+import BudgetBarChart from "@/components/BudgetBarChart";
+import TransactionList from "@/components/TransactionList";
 import { Text } from "@/components/Themed";
 import { Transaction } from "@/types/Transaction";
-import CategoryChart from "@/components/CategoryChart";
-import TransactionList from "@/components/TransactionList";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import { apiRequest } from "@/services/api";
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string | null>("Usuário");
-  const router = useRouter();
+  const [userName, setUserName] = useState<string | null>(null);
 
-  // buscar transações do backend
-  const loadTransactions = async () => {
+  // 🔹 Carregar dados
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      setLoading(true);
-      const data: Transaction[] = await apiRequest("/transactions");
-      setTransactions(data);
-      setError(null);
-    } catch (err: any) {
-      console.error("Erro ao buscar transações:", err);
-      setError("Não foi possível carregar as transações.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTransactions();
-  }, []);
-
-  // verifica login e carrega nome do usuário
-  useEffect(() => {
-    async function loadUser() {
-      const userData = await AsyncStorage.getItem("@user");
-
-      if (!userData) {
-        router.replace("/login");
+      const user = await getUser();
+      if (!user?.id) {
+        setError("Usuário inválido. Contate o suporte.");
+        router.replace("/auth/login");
         return;
       }
 
-      const user = JSON.parse(userData);
       setUserName(user.name || "Usuário");
+
+      const data = await authRequest(`/transactions?userId=${user.id}`, "GET");
+
+      const mappedData: Transaction[] = (data || []).map((t: any) => ({
+        id: t.id,
+        description: t.description || "Sem descrição",
+        amount: Number(t.amount),
+        date: t.date,
+        type: t.type === "income" ? "income" : "expense",
+        category: {
+          name: t.category?.name || t.category_name || "Outros",
+        },
+      }));
+
+      setTransactions(mappedData);
+    } catch (err: any) {
+      console.error("Erro ao carregar transações:", err);
+      setError("Erro ao carregar dados. Tente novamente.");
+    } finally {
+      setLoading(false);
     }
+  }, [router]);
 
-    loadUser();
-  }, []);
-
-  // logout
-  async function handleLogout() {
-    await AsyncStorage.removeItem("@user");
-    Alert.alert("Logout", "Você saiu da sua conta.");
-    router.replace("/login");
-  }
+  // 🔹 Atualizar dados sempre que a aba ganhar foco
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [loadData])
+  );
 
   if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#4695a0ff" />
-        <Text>Carregando transações...</Text>
+        <Text>Carregando...</Text>
       </View>
     );
   }
 
-  // Erro
   if (error) {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.reloadButton}
-          onPress={loadTransactions}
-        >
+        <TouchableOpacity style={styles.reloadButton} onPress={loadData}>
           <Text style={styles.reloadText}>Tentar novamente</Text>
         </TouchableOpacity>
       </View>
@@ -91,26 +90,31 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>
-          Dashboard de {userName ? userName : "..."}
-        </Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Sair</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Dashboard</Text>
       </View>
 
-      {/* 1Gráfico de categorias */}
+      {/* Gráficos */}
       <CategoryChart transactions={transactions} />
+      <BudgetBarChart transactions={transactions} />
 
-      {/* 2Lista de transações */}
-      <TransactionList
-        transactions={transactions.map((t) => ({
-          ...t,
-          description: t.description || "Sem descrição", // garante tipagem segura
-        }))}
-      />
+      {/* Últimas 3 transações */}
+      <View style={{ marginVertical: 20 }}>
+        <Text style={styles.subtitle}>Transações Recentes</Text>
+        {transactions.length > 0 ? (
+          <TransactionList
+            transactions={transactions
+              .slice() // cria uma cópia
+              .sort(
+                (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+              ) // mais recentes primeiro
+              .slice(0, 3) // pega apenas 3
+            }
+          />
+        ) : (
+          <Text style={styles.noDataText}>Nenhuma transação registrada</Text>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -128,25 +132,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 20,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-  },
-  logoutButton: {
-    backgroundColor: "#ff3b30",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  logoutText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  centered: { 
-    flex: 1, 
-    justifyContent: "center", 
-    alignItems: "center" 
-  },
+  title: { fontSize: 22, fontWeight: "bold", color: '#000000ff'},
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   errorText: {
     color: "red",
     fontSize: 16,
@@ -159,8 +146,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 8,
   },
-  reloadText: { 
-    color: "#fff", 
-    fontWeight: "600" 
+  reloadText: { color: "#fff", fontWeight: "600" },
+  subtitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+    fontFamily: "System",
+    color: '#000000ff',
+
+  },
+  noDataText: {
+    textAlign: "center",
+    marginTop: 20,
+    color: "#777",
+    fontFamily: "System",
   },
 });

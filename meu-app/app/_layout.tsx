@@ -1,59 +1,68 @@
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/components/useColorScheme';
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
-
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+import React, { useEffect, useState, useRef } from "react";
+import { Stack, useRouter, useSegments } from "expo-router";
+import { View, ActivityIndicator, SafeAreaView } from "react-native";
+import { getUser } from "@/services/auth";
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-    ...FontAwesome.font,
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const router = useRouter();
+  const segments = useSegments();
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+  // Evita múltiplos redirecionamentos
+  const hasRedirected = useRef(false);
 
+  // Verifica login no SecureStore
   useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+    const checkLogin = async () => {
+      try {
+        const user = await getUser();
+        console.log("👤 Usuário carregado do SecureStore:", user);
+        setIsLoggedIn(!!user?.id);
+      } catch (error) {
+        console.error("Erro ao verificar login:", error);
+        setIsLoggedIn(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkLogin();
+  }, []);
+
+  // Controla navegação inicial com segurança
+  useEffect(() => {
+    if (isLoading || isLoggedIn === null) return;
+    if (hasRedirected.current) return; // Evita loops infinitos
+
+    const inAuthGroup = segments[0] === "auth";
+
+    if (!isLoggedIn && !inAuthGroup) {
+      console.log("🔁 Redirecionando para login");
+      hasRedirected.current = true;
+      router.replace("/auth/login");
+    } else if (isLoggedIn && inAuthGroup) {
+      console.log("🔁 Redirecionando para abas principais");
+      hasRedirected.current = true;
+      router.replace("/(tabs)");
     }
-  }, [loaded]);
+  }, [isLoading, isLoggedIn]);
 
-  if (!loaded) {
-    return null;
-  }
 
-  return <RootLayoutNav />;
+if (isLoading) {
+  return (
+    <SafeAreaView
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#fff",
+      }}
+    >
+      <ActivityIndicator size="large" color="#4695a0" />
+    </SafeAreaView>
+  );
 }
 
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
-    </ThemeProvider>
-  );
+  return <Stack screenOptions={{ headerShown: false }} />;
 }
