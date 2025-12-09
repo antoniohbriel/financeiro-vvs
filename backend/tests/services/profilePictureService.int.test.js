@@ -20,7 +20,7 @@ describe("ProfilePictureService - Integração", () => {
     app.use(express.json());
     app.use(express.raw({ type: "application/octet-stream", limit: "5mb" })); // necessário para buffer
 
-    // Rota de upload
+    // upload
     app.post("/profile-photo/:userId", async (req, res) => {
       try {
         const result = await service.uploadPhoto(
@@ -33,7 +33,7 @@ describe("ProfilePictureService - Integração", () => {
       }
     });
 
-    // Rota de busca
+    // busca
     app.get("/profile-photo/:userId", async (req, res) => {
       try {
         const result = await service.getPhoto(req.params.userId);
@@ -44,7 +44,6 @@ describe("ProfilePictureService - Integração", () => {
     });
   });
 
-  // ----------------------------------------------------------------------
   test("Deve fazer upload de foto com sucesso", async () => {
     const fakeBuffer = Buffer.from("teste");
 
@@ -63,7 +62,6 @@ describe("ProfilePictureService - Integração", () => {
     expect(res.body.user_id).toBe(10);
   });
 
-  // ----------------------------------------------------------------------
   test("Deve retornar erro 400 quando userId for inválido no upload", async () => {
     const res = await request(app)
       .post("/profile-photo/abc")
@@ -74,7 +72,6 @@ describe("ProfilePictureService - Integração", () => {
     expect(res.body.message).toBe("ID de usuário inválido.");
   });
 
-  // ----------------------------------------------------------------------
   test("Deve retornar erro 404 quando usuário não existir (P2003)", async () => {
     repository.upsert.mockRejectedValue({ code: "P2003" });
 
@@ -87,7 +84,6 @@ describe("ProfilePictureService - Integração", () => {
     expect(res.body.message).toBe("Usuário associado à foto não encontrado.");
   });
 
-  // ----------------------------------------------------------------------
   test("Deve retornar erro 500 para falha inesperada no upload", async () => {
     repository.upsert.mockRejectedValue(new Error("falha"));
 
@@ -100,7 +96,6 @@ describe("ProfilePictureService - Integração", () => {
     expect(res.body.message).toBe("Falha ao salvar a foto de perfil.");
   });
 
-  // ----------------------------------------------------------------------
   test("Deve obter foto com sucesso", async () => {
     const fakeBuffer = Buffer.from("img");
 
@@ -115,7 +110,6 @@ describe("ProfilePictureService - Integração", () => {
     expect(res.body.user_id).toBe(10);
   });
 
-  // ----------------------------------------------------------------------
   test("Deve retornar erro 400 quando userId é inválido ao buscar", async () => {
     const res = await request(app).get("/profile-photo/aaa");
 
@@ -123,7 +117,6 @@ describe("ProfilePictureService - Integração", () => {
     expect(res.body.message).toBe("ID de usuário inválido.");
   });
 
-  // ----------------------------------------------------------------------
   test("Deve retornar erro 404 quando foto não existir", async () => {
     repository.findUnique.mockResolvedValue(null);
 
@@ -133,7 +126,6 @@ describe("ProfilePictureService - Integração", () => {
     expect(res.body.message).toBe("Foto de perfil não encontrada.");
   });
 
-  // ----------------------------------------------------------------------
   test("Deve retornar erro 500 quando falhar ao buscar foto", async () => {
     repository.findUnique.mockRejectedValue(new Error("falha"));
 

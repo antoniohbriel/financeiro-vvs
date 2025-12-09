@@ -20,7 +20,7 @@ describe("BudgetService - Integração", () => {
 
     service = BudgetService(repository);
 
-    // Criamos um servidor express fictício só p/ rodar o teste
+    // servidor express fictício só pra rodar o teste
     app = express();
     app.use(express.json());
 
@@ -41,8 +41,6 @@ describe("BudgetService - Integração", () => {
     });
   });
 
-  // -----------------------------------------------------------------
-
   test("Deve listar budgets de um usuário", async () => {
     const mockBudgets = [
       { id: 1, user_id: 10, category_id: 2, amount: 200 }
@@ -57,7 +55,6 @@ describe("BudgetService - Integração", () => {
     expect(repository.findAllByUser).toHaveBeenCalledWith("10");
   });
 
-  // -----------------------------------------------------------------
 
   test("Deve criar um novo budget quando não existe", async () => {
     repository.findByUserAndCategory.mockResolvedValue(null);
@@ -79,7 +76,6 @@ describe("BudgetService - Integração", () => {
     expect(res.body.amount).toBe(300);
   });
 
-  // -----------------------------------------------------------------
 
   test("Deve atualizar budget existente", async () => {
     repository.findByUserAndCategory.mockResolvedValue(
@@ -102,7 +98,6 @@ describe("BudgetService - Integração", () => {
     expect(res.body.amount).toBe(500);
   });
 
-  // -----------------------------------------------------------------
 
   test("Deve deletar um budget", async () => {
     repository.delete.mockResolvedValue(true);
